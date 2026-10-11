@@ -40,6 +40,8 @@ The repository includes a deterministic sample-headline corpus for the demo, cov
 
 The portfolio and its stress shocks are synthetic, illustrative assumptions rather than holdings, market data, or calibrated risk factors. The fixed portfolio asset classes and the scenario shock percentages are intended to make the stress-test mechanics transparent, not to represent investment advice or real-world valuation.
 
+The loan-book sector mix is derived from positive transaction spend in `transactions_data.csv`, mapped from merchant category code descriptions using simple keyword rules. Corporate bonds, government bonds, equities, derivatives, and all stress shocks remain synthetic assumptions.
+
 ## 4. Quickstart & Installation
 
 Prerequisite: Python 3.12 on Windows.

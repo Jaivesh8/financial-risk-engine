@@ -1,0 +1,14 @@
+asset_class,sector,value_cr,source
+loans,Automotive,1.618395,derived from transactions_data.csv
+loans,Banking,0.743756,derived from transactions_data.csv
+loans,Commodities,1.053628,derived from transactions_data.csv
+loans,Consumer,24.549905,derived from transactions_data.csv
+loans,Energy,5.094474,derived from transactions_data.csv
+loans,Healthcare,2.456472,derived from transactions_data.csv
+loans,Logistics,2.503309,derived from transactions_data.csv
+loans,Real Estate,0.181942,derived from transactions_data.csv
+loans,Technology,1.798119,derived from transactions_data.csv
+corp_bonds,Banking,20,synthetic assumption
+govt_bonds,Fixed Income,20,synthetic assumption
+equities,Mixed,15,synthetic assumption
+derivatives,Mixed,5,synthetic assumption
