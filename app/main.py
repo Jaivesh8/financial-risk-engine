@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from app.database.db import get_signal, insert_stress_test, list_stress_tests
+from app.ingestion import ingest_articles
 from app.nlp.event_classifier import ZeroShotEventClassifier
 from app.nlp.sentiment import get_sentiment_model
 from app.risk.calculator import run_stress_test, should_trigger
@@ -21,6 +22,7 @@ EVENT_SEVERITY = {
 }
 
 event_classifier = ZeroShotEventClassifier()
+last_ingested_articles: list[dict] = []
 
 
 def score_impact(
@@ -74,6 +76,35 @@ def analyze_article(article: ArticleInput):
         affected_sectors=[],
         stress_test_triggered=impact > 7,
     )
+
+
+def _analyze_ingested_article(article: dict) -> dict:
+    """Add the existing signal analysis to a normalized ingested article."""
+    signal = analyze_article(ArticleInput(
+        text=article["text"],
+        source=article["source"],
+        company=article.get("company"),
+    ))
+    return {**article, "analysis": signal.model_dump()}
+
+
+@app.get("/ingest")
+def ingest(use_sample: bool = True, newsapi_key: str | None = None):
+    """Ingest articles and return each one with a risk signal analysis."""
+    global last_ingested_articles
+    last_ingested_articles = [
+        _analyze_ingested_article(article)
+        for article in ingest_articles(use_sample=use_sample, newsapi_key=newsapi_key)
+    ]
+    return last_ingested_articles
+
+
+@app.get("/articles")
+def get_articles():
+    """Return the latest ingestion, or the sample corpus before first ingestion."""
+    if last_ingested_articles:
+        return last_ingested_articles
+    return ingest(use_sample=True)
 
 
 def _test_signal(signal_id: int | None) -> dict:

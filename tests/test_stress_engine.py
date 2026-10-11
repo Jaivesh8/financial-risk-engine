@@ -18,6 +18,8 @@ def test_geopolitical_stress_test_has_loss():
     result = run_stress_test(Portfolio(), "Geopolitical", 9, ["Banking"])
 
     assert result["loss"] > 0
+    assert len(result["by_asset_class"]) == 5
+    assert result["by_asset_class"][0]["asset_class"] == "loans"
 
 
 def test_geopolitical_event_at_eight_triggers():

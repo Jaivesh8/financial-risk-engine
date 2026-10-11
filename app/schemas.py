@@ -20,6 +20,14 @@ class StressRequest(BaseModel):
     force: bool = False
 
 
+class AssetClassStressResult(BaseModel):
+    asset_class: str
+    pre_value: float
+    post_value: float
+    loss: float
+    loss_pct: float
+
+
 class StressResponse(BaseModel):
     pre_value: float
     post_value: float
@@ -28,6 +36,7 @@ class StressResponse(BaseModel):
     event: str
     impact_score: float
     affected_sectors: list[str]
+    by_asset_class: list[AssetClassStressResult]
 
 
 class RiskSignal(BaseModel):
