@@ -1,5 +1,10 @@
-from fastapi import FastAPI
-from app.schemas import ArticleInput, RiskSignal
+from fastapi import FastAPI, HTTPException
+from app.database.db import get_signal, insert_stress_test, list_stress_tests
+from app.nlp.event_classifier import ZeroShotEventClassifier
+from app.nlp.sentiment import get_sentiment_model
+from app.risk.calculator import run_stress_test, should_trigger
+from app.risk.portfolio import Portfolio
+from app.schemas import ArticleInput, RiskSignal, StressRequest, StressResponse
 
 app = FastAPI(title="Financial AI Risk Engine")
 
@@ -8,60 +13,14 @@ EVENT_SEVERITY = {
     "Macroeconomic": 7,
     "Credit Event": 8,
     "Merger/Acquisition": 6,
+    "Earnings": 4,
+    "Regulatory": 5,
+    "Product Launch": 4,
+    "Other": 4,
     "Corporate": 4,
 }
 
-NEGATIVE_WORDS = {
-    "crisis", "default", "war", "sanctions",
-    "loss", "collapse", "fraud", "downgrade",
-    "bankruptcy", "recession", "disruption",
-}
-
-POSITIVE_WORDS = {
-    "growth", "profit", "surge", "recovery",
-    "upgrade", "expansion", "record", "approval",
-}
-
-
-def classify_event(text: str) -> str:
-    text = text.lower()
-
-    if any(w in text for w in [
-        "war", "sanctions", "invasion", "geopolitical"
-    ]):
-        return "Geopolitical"
-
-    if any(w in text for w in [
-        "interest rate", "inflation", "recession",
-        "central bank", "monetary policy"
-    ]):
-        return "Macroeconomic"
-
-    if any(w in text for w in [
-        "default", "bankruptcy", "credit downgrade",
-        "debt crisis"
-    ]):
-        return "Credit Event"
-
-    if any(w in text for w in [
-        "merger", "acquisition", "acquires"
-    ]):
-        return "Merger/Acquisition"
-
-    return "Corporate"
-
-
-def score_sentiment(text: str) -> float:
-    words = text.lower().split()
-    negative = sum(w.strip(".,:;!?") in NEGATIVE_WORDS for w in words)
-    positive = sum(w.strip(".,:;!?") in POSITIVE_WORDS for w in words)
-
-    if positive + negative == 0:
-        return 0.0
-
-    return round(
-        (positive - negative) / (positive + negative), 2
-    )
+event_classifier = ZeroShotEventClassifier()
 
 
 def score_impact(
@@ -94,24 +53,62 @@ def health():
 
 @app.post("/analyze", response_model=RiskSignal)
 def analyze_article(article: ArticleInput):
-    text = f"{article.title} {article.text}"
+    text = article.text
 
-    event_type = classify_event(text)
-    sentiment = score_sentiment(text)
+    event_type, _confidence = event_classifier.classify(text)
+    sentiment = get_sentiment_model().score(text)
 
     impact = score_impact(
         event_type,
         sentiment,
-        article.source_count,
-        article.sectors,
+        article.n_sources,
+        [],
     )
 
     return RiskSignal(
         source=article.source,
-        title=article.title,
+        title=article.text,
         sentiment_score=sentiment,
         event_type=event_type,
         impact_score=impact,
-        affected_sectors=article.sectors,
+        affected_sectors=[],
         stress_test_triggered=impact > 7,
     )
+
+
+def _test_signal(signal_id: int | None) -> dict:
+    """Provide a deterministic signal until the signal persistence module exists."""
+    return {
+        "signal_id": signal_id,
+        "event": "Geopolitical",
+        "impact_score": 8.0,
+        "affected_sectors": ["Banking", "Fixed Income", "Mixed"],
+    }
+
+
+@app.post("/stress-test", response_model=StressResponse)
+def stress_test(request: StressRequest):
+    # Signal persistence is not part of this milestone, so use a deterministic
+    # test signal when no stored signal can be retrieved.
+    signal = (
+        get_signal(request.signal_id)
+        if request.signal_id is not None
+        else None
+    ) or _test_signal(request.signal_id)
+    if not request.force and not should_trigger(signal["event"], signal["impact_score"]):
+        raise HTTPException(status_code=400, detail="Signal does not meet stress-test trigger.")
+
+    result = run_stress_test(
+        Portfolio(),
+        signal["event"],
+        signal["impact_score"],
+        signal["affected_sectors"],
+    )
+    result["signal_id"] = signal["signal_id"]
+    insert_stress_test(result)
+    return StressResponse(**result)
+
+
+@app.get("/stress-tests")
+def get_stress_tests():
+    return list_stress_tests(limit=10)

@@ -1,12 +1,33 @@
 from pydantic import BaseModel, Field
 
 
-class ArticleInput(BaseModel):
-    source: str
-    title: str
+class TextIn(BaseModel):
     text: str
-    sectors: list[str] = []
-    source_count: int = Field(default=1, ge=1)
+    source: str
+    company: str | None = None
+    n_sources: int = Field(default=1, ge=1)
+
+
+class ArticleInput(BaseModel):
+    text: str
+    source: str
+    company: str | None = None
+    n_sources: int = Field(default=1, ge=1)
+
+
+class StressRequest(BaseModel):
+    signal_id: int | None = None
+    force: bool = False
+
+
+class StressResponse(BaseModel):
+    pre_value: float
+    post_value: float
+    loss: float
+    loss_pct: float
+    event: str
+    impact_score: float
+    affected_sectors: list[str]
 
 
 class RiskSignal(BaseModel):
